@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>校园答题抽题小游戏</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .container {
+      width: 100%;
+      max-width: 420px;
+      background: rgba(255,255,255,0.95);
+      border-radius: 28px;
+      padding: 30px 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+      text-align: center;
+      transition: all 0.3s;
+    }
+    h1 { font-size: 26px; color: #4a3f7a; margin-bottom: 8px; }
+    .sub { font-size: 14px; color: #888; margin-bottom: 25px; }
+
+    .draw-area { margin: 20px 0; }
+    .draw-box {
+      background: #f3e8ff;
+      border: 2px dashed #b49bde;
+      border-radius: 20px;
+      padding: 25px 15px;
+      margin: 20px 0;
+      min-height: 100px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    .draw-box .icon { font-size: 48px; margin-bottom: 10px; }
+    .draw-box .status-text { font-size: 16px; color: #5a4b8a; }
+    .btn {
+      background: #7c5ce7;
+      color: white;
+      border: none;
+      font-size: 18px;
+      padding: 14px 30px;
+      border-radius: 50px;
+      width: 100%;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(124,92,231,0.4);
+      transition: transform 0.2s, background 0.2s;
+    }
+    .btn:active { transform: scale(0.96); background: #6746d1; }
+    .btn:disabled { background: #bbb; box-shadow: none; cursor: not-allowed; }
+
+    .quiz-area { text-align: left; margin-top: 25px; display: none; }
+    .quiz-title { font-size: 18px; font-weight: bold; color: #4a3f7a; margin-bottom: 15px; }
+    .question-block {
+      background: #f9f7ff;
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+    .question-text { font-weight: 600; margin-bottom: 12px; color: #333; }
+    .options label {
+      display: block;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      background: white;
+      border: 1.5px solid #e0d7f5;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .options label:hover { background: #ede4ff; }
+    .options input[type="radio"] { margin-right: 8px; transform: scale(1.2); }
+
+    .result-area { display: none; margin-top: 20px; }
+    .score {
+      font-size: 42px;
+      font-weight: bold;
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .footer-note { margin-top: 20px; font-size: 13px; color: #aaa; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>🎲 幸运抽题</h1>
+  <div class="sub">摇一摇，抽一张题单来挑战吧！</div>
+
+  <!-- 抽取区域 -->
+  <div class="draw-area" id="drawArea">
+    <div class="draw-box" id="drawBox">
+      <div class="icon">📦</div>
+      <div class="status-text" id="drawStatus">点击下方按钮抽题</div>
+    </div>
+    <button class="btn" id="drawBtn" onclick="startDraw()">✨ 抽取题单 ✨</button>
+  </div>
+
+  <!-- 答题区域（初始隐藏） -->
+  <div class="quiz-area" id="quizArea">
+    <div class="quiz-title" id="paperTitle"></div>
+    <div id="questionsContainer"></div>
+    <button class="btn" onclick="submitQuiz()">📩 提交作答</button>
+    <button class="btn" style="background:#aaa; margin-top:10px;" onclick="resetToDraw()">↩ 重新抽题</button>
+  </div>
+
+  <!-- 结果区域 -->
+  <div class="result-area" id="resultArea">
+    <div style="font-size:18px;">你的得分</div>
+    <div class="score" id="scoreDisplay">0</div>
+    <div style="font-size:14px; color:#666;" id="scoreMsg"></div>
+    <button class="btn" style="margin-top:20px;" onclick="resetToDraw()">🔄 再来一局</button>
+  </div>
+
+  <div class="footer-note">📱 手机扫码即可参与 · 活动专用</div>
+</div>
+
+<script>
+  // ========== 在这里修改你的题单数据 ==========
+  const paperPool = [
+    {
+      id: 1,
+      name: "📚 文学常识挑战",
+      questions: [
+        { question: "《红楼梦》的作者是谁？", options: ["曹雪芹", "罗贯中", "吴承恩", "施耐庵"], answer: 0 },
+        { question: "“床前明月光”出自哪位诗人？", options: ["杜甫", "白居易", "李白", "王维"], answer: 2 },
+        { question: "《小王子》的作者是哪国人？", options: ["法国", "英国", "美国", "德国"], answer: 0 }
+      ]
+    },
+    {
+      id: 2,
+      name: "🧪 趣味科学",
+      questions: [
+        { question: "水的化学式是什么？", options: ["O₂", "CO₂", "H₂O", "NaCl"], answer: 2 },
+        { question: "光在真空中速度约为？", options: ["30万km/s", "3万km/s", "3000km/s", "300km/s"], answer: 0 },
+        { question: "人体最大的器官是？", options: ["心脏", "皮肤", "肝脏", "肺"], answer: 1 }
+      ]
+    },
+    {
+      id: 3,
+      name: "🎬 影视动画",
+      questions: [
+        { question: "《千与千寻》的导演是谁？", options: ["新海诚", "宫崎骏", "细田守", "押井守"], answer: 1 },
+        { question: "漫威电影中雷神的锤子叫什么？", options: ["暴风战斧", "雷神之锤", "永恒之枪", "无限手套"], answer: 1 },
+        { question: "《疯狂动物城》的兔子警官叫什么？", options: ["朱迪", "尼克", "闪电", "本杰明"], answer: 0 }
+      ]
+    }
+  ];
+
+  // 当前抽中的题单、用户答案
+  let currentPaper = null;
+  let userAnswers = [];
+
+  // 抽取题单
+  function startDraw() {
+    const drawBtn = document.getElementById('drawBtn');
+    drawBtn.disabled = true;
+    drawBtn.textContent = '🎰 抽题中...';
+    const statusEl = document.getElementById('drawStatus');
+    statusEl.textContent = '正在为你随机挑选...';
+
+    // 模拟滚动抽取动画（0.8秒后显示结果）
+    const interval = setInterval(() => {
+      const randomPaper = paperPool[Math.floor(Math.random() * paperPool.length)];
+      statusEl.textContent = '📋 ' + randomPaper.name;
+    }, 100);
+
+    setTimeout(() => {
+      clearInterval(interval);
+      // 最终随机确定一张题单
+      const finalPaper = paperPool[Math.floor(Math.random() * paperPool.length)];
+      currentPaper = finalPaper;
+      userAnswers = new Array(finalPaper.questions.length).fill(-1);
+      statusEl.textContent = '✅ 抽中：' + finalPaper.name;
+      drawBtn.textContent = '✨ 开始答题';
+      drawBtn.disabled = false;
+      // 改变按钮行为：开始答题
+      drawBtn.onclick = showQuiz;
+    }, 800);
+  }
+
+  // 显示答题界面
+  function showQuiz() {
+    if (!currentPaper) return;
+    document.getElementById('drawArea').style.display = 'none';
+    const quizArea = document.getElementById('quizArea');
+    const resultArea = document.getElementById('resultArea');
+    quizArea.style.display = 'block';
+    resultArea.style.display = 'none';
+
+    document.getElementById('paperTitle').textContent = '📝 ' + currentPaper.name;
+    const container = document.getElementById('questionsContainer');
+    container.innerHTML = '';
+    currentPaper.questions.forEach((q, idx) => {
+      const qBlock = document.createElement('div');
+      qBlock.className = 'question-block';
+      let optionsHtml = '';
+      q.options.forEach((opt, optIdx) => {
+        optionsHtml += `
+          <label>
+            <input type="radio" name="q${idx}" value="${optIdx}" onclick="selectAnswer(${idx}, ${optIdx})">
+            ${opt}
+          </label>
+        `;
+      });
+      qBlock.innerHTML = `
+        <div class="question-text">${idx+1}. ${q.question}</div>
+        <div class="options">${optionsHtml}</div>
+      `;
+      container.appendChild(qBlock);
+    });
+  }
+
+  // 记录用户选择
+  function selectAnswer(qIdx, optIdx) {
+    userAnswers[qIdx] = optIdx;
+  }
+
+  // 提交评分
+  function submitQuiz() {
+    if (!currentPaper) return;
+    // 检查是否全部作答
+    const unanswered = userAnswers.findIndex(a => a === -1);
+    if (unanswered !== -1) {
+      alert(`请先完成第 ${unanswered+1} 题`);
+      return;
+    }
+    let score = 0;
+    currentPaper.questions.forEach((q, idx) => {
+      if (userAnswers[idx] === q.answer) score++;
+    });
+    const total = currentPaper.questions.length;
+    document.getElementById('quizArea').style.display = 'none';
+    const resultArea = document.getElementById('resultArea');
+    resultArea.style.display = 'block';
+    document.getElementById('scoreDisplay').textContent = `${score} / ${total}`;
+    const percent = score / total;
+    let msg = '';
+    if (percent === 1) msg = '🎉 太厉害了，全部正确！';
+    else if (percent >= 0.6) msg = '👍 表现不错，继续加油！';
+    else msg = '📖 再试试别的题单吧~';
+    document.getElementById('scoreMsg').textContent = msg;
+  }
+
+  // 重置，重新抽题
+  function resetToDraw() {
+    currentPaper = null;
+    userAnswers = [];
+    document.getElementById('quizArea').style.display = 'none';
+    document.getElementById('resultArea').style.display = 'none';
+    const drawArea = document.getElementById('drawArea');
+    drawArea.style.display = 'block';
+    const drawBtn = document.getElementById('drawBtn');
+    drawBtn.disabled = false;
+    drawBtn.textContent = '✨ 抽取题单 ✨';
+    drawBtn.onclick = startDraw;
+    document.getElementById('drawStatus').textContent = '点击下方按钮抽题';
+  }
+</script>
+</body>
+</html>
